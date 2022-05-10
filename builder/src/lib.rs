@@ -3,7 +3,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::DeriveInput;
 
-#[proc_macro_derive(Builder)]
+#[proc_macro_derive(Builder, attributes(builder))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse_macro_input!(input as DeriveInput);
     do_derive(ast).unwrap_or_else(syn::Error::into_compile_error).into()
@@ -21,6 +21,8 @@ fn do_derive(ast:DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 
         if utils::is_field_optional(field) {
             quote!(#ident: #ty)
+        } else if let Some(attr_name) = utils::get_each_attr_name(field) {
+            quote!(#ident: #ty)
         } else {
             quote!(
                 #ident : Option<#ty>
@@ -30,9 +32,16 @@ fn do_derive(ast:DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 
     let gen_builder_default : Vec<_> = fields.iter().map(|field| {
         let ident = &field.ident;
-        quote!(
-            #ident : None
-        )
+        let field_type =  &field.ty;
+        if utils::get_each_attr_name(field).is_some() {
+            quote! {
+                #ident : <#field_type>::new()
+            }
+        } else {
+            quote!(
+                #ident : None
+            )
+        }
     }).collect();
 
     let gen_setters: Vec<_> = fields.iter().map(|field| {
@@ -49,6 +58,15 @@ fn do_derive(ast:DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             } else {
                 Ok(quote!())
             }
+        } else if let Some(Ok(attr_name)) = utils::get_each_attr_name(field) {
+            let inner_type = utils::extract_inner_type(field, "Vec".into());
+            let attr_ident = quote::format_ident!("{}", attr_name);
+            Ok(quote!(
+                fn #attr_ident(&mut self, #attr_ident: #inner_type) -> &mut Self {
+                    self.#ident.push(#attr_ident);
+                    self
+                }
+            ))
         } else {
             Ok(quote!{
                 fn #ident(&mut self, #ident: #ty) -> &mut Self {
@@ -64,6 +82,8 @@ fn do_derive(ast:DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         let missing_msg = format!("Field {:?} is missing", field_name);
         if utils::is_field_optional(field) {
             quote!()
+        } else if utils::get_each_attr_name(field).is_some() {
+            quote!()
         } else {
             quote!{
                 if let std::option::Option::None = self.#field_name {
@@ -77,6 +97,10 @@ fn do_derive(ast:DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         let ident = &field.ident;
         // let ty = &field.ty;
         if utils::is_field_optional(field) {
+            quote!{
+                #ident : self.#ident.clone()
+            }
+        } else if utils::get_each_attr_name(field).is_some() {
             quote!{
                 #ident : self.#ident.clone()
             }
@@ -97,6 +121,27 @@ fn do_derive(ast:DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             )
         }
     };
+
+    // eprintln!("{:#?}", fields);
+
+    /*
+    let gen_fn_each: Vec<_>= fields.iter().map(|field| {
+        let ident = &field.ident;
+        if let Some(Ok(attr_name)) = utils::get_each_attr_name(field) {
+            let inner_type = utils::extract_inner_type(field, "Vec".into());
+            let attr_ident = quote::format_ident!("{}", attr_name);
+
+            quote!(
+                fn #attr_ident(&mut self, #attr_ident: #inner_type) -> &mut Self {
+                    self.#ident.push(#attr_ident);
+                    self
+                }
+            )
+        } else {
+            quote!()
+        }
+    }).collect();
+    */
 
     let derive = quote!{
         pub struct #builder_ident {
