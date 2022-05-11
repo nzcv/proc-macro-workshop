@@ -102,34 +102,57 @@ pub fn extract_inner_type(field: &syn::Field, container_ident: String) -> Option
     }
     return None
 }
-
-pub fn get_each_attr_name(field: &syn::Field) -> Option<Result<String>> {
+/*
+attr NameValue(
+    MetaNameValue {
+        path: Path {
+            leading_colon: None,
+            segments: [
+                PathSegment {
+                    ident: Ident {
+                        ident: "debug",
+                        span: #0 bytes(1023..1028),
+                    },
+                    arguments: None,
+                },
+            ],
+        },
+        eq_token: Eq,
+        lit: Str(
+            LitStr {
+                token: "0b{:08b}",
+            },
+        ),
+    },
+)
+*/
+pub fn get_attr_lit(field: &syn::Field, ident_literal: &str) -> Option<String> {
     if let Some(attr) = field.attrs.last() {
         if let Ok(ref meta) = attr.parse_meta() {
-            if meta.path().is_ident("builder") {
-                if let syn::Meta::List(
-                    syn::MetaList{
-                        nested,
-                        ..
-                    }
-                ) = meta {
-                    if let Some(syn::NestedMeta::Meta(
-                        syn::Meta::NameValue(
-                            syn::MetaNameValue{
-                                path,
-                                lit:syn::Lit::Str(
-                                    lit
-                                ),
-                                ..
-                            }
-                        )
-                    )) = nested.last() {
-                        if path.is_ident("each") {
-                            return Some(Ok(lit.value()))
+            if meta.path().is_ident(ident_literal) {
+                // eprintln!("meta {:#?}", meta);
+                if let syn::Meta::NameValue(syn::MetaNameValue{ path, lit:syn::Lit::Str(lit), .. }) = meta {
+                    return Some(lit.value())
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn get_attr_name(field: &syn::Field, ident_literal: &str, attar_literal: &str) -> Option<Result<String>> {
+    if let Some(attr) = field.attrs.last() {
+        if let Ok(ref meta) = attr.parse_meta() {
+            eprintln!("attr {:#?}", meta);
+            if meta.path().is_ident(ident_literal) {
+                if let syn::Meta::List(syn::MetaList{ nested, .. }) = meta {
+                    if let Some(syn::NestedMeta::Meta( syn::Meta::NameValue(syn::MetaNameValue{ path, lit:syn::Lit::Str(lit), .. }))) = nested.last() {
+                        return if path.is_ident(attar_literal) {
+                            Some(Ok(lit.value()))
                         } else {
-                            return Some(Err(syn::Error::new_spanned(meta, r#"expected `builder(each = "...")`"#)))
+                            let err_msg = format!(r#"expected `{}({} = "...")`"#, ident_literal, attar_literal);
+                            Some(Err(syn::Error::new_spanned(meta, err_msg)))
                         }
-                        
                     }
                 }
             }

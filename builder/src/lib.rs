@@ -19,16 +19,21 @@ fn do_derive(ast:DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         let ident = &field.ident;
         let ty = &field.ty;
 
-        if utils::is_field_optional(field) {
-            quote!(#ident: #ty)
+        if utils::is_field(field, "Option".into()) {
+            Ok(quote!(#ident: #ty))
         } else if let Some(attr_name) = utils::get_each_attr_name(field) {
-            quote!(#ident: #ty)
+            match attr_name {
+                Ok(attr_name) => {
+                    Ok(quote!(#ident: #ty))
+                }
+                Err(e) => {
+                    Err(e)
+                }
+            }
         } else {
-            quote!(
-                #ident : Option<#ty>
-            )
+            Ok(quote!(#ident : Option<#ty>))
         }
-    }).collect();
+    }).collect::<syn::Result<Vec<_>>>()?;
 
     let gen_builder_default : Vec<_> = fields.iter().map(|field| {
         let ident = &field.ident;

@@ -1,54 +1,47 @@
-// The std::process::Command builder handles args in a way that is potentially
-// more convenient than passing a full vector of args to the builder all at
-// once.
+// Figure out what impl needs to be generated for the Debug impl of Field<T>.
+// This will involve adding a trait bound to the T type parameter of the
+// generated impl.
 //
-// Look for a field attribute #[builder(each = "...")] on each field. The
-// generated code may assume that fields with this attribute have the type Vec
-// and should use the word given in the string literal as the name for the
-// corresponding builder method which accepts one vector element at a time.
-//
-// In order for the compiler to know that these builder attributes are
-// associated with your macro, they must be declared at the entry point of the
-// derive macro. Otherwise the compiler will report them as unrecognized
-// attributes and refuse to compile the caller's code.
-//
-//     #[proc_macro_derive(Builder, attributes(builder))]
-//
-// These are called inert attributes. The word "inert" indicates that these
-// attributes do not correspond to a macro invocation on their own; they are
-// simply looked at by other macro invocations.
-//
-// If the new one-at-a-time builder method is given the same name as the field,
-// avoid generating an all-at-once builder method for that field because the
-// names would conflict.
+// Callers should be free to instantiate Field<T> with a type parameter T which
+// does not implement Debug, but such a Field<T> will not fulfill the trait
+// bounds of the generated Debug impl and so will not be printable via Debug.
 //
 //
 // Resources:
 //
-//   - Relevant syntax tree types:
-//     https://docs.rs/syn/1.0/syn/struct.Attribute.html
-//     https://docs.rs/syn/1.0/syn/enum.Meta.html
+//   - Representation of generics in the Syn syntax tree:
+//     https://docs.rs/syn/1.0/syn/struct.Generics.html
+//
+//   - A helper for placing generics into an impl signature:
+//     https://docs.rs/syn/1.0/syn/struct.Generics.html#method.split_for_impl
+//
+//   - Example code from Syn which deals with type parameters:
+//     https://github.com/dtolnay/syn/tree/master/examples/heapsize
 
-use derive_builder::Builder;
+use derive_debug::CustomDebug;
 
-#[derive(Builder)]
-pub struct Command {
-    executable: String,
-    #[builder(each = "arg")]
-    args: Vec<String>,
-    #[builder(each = "env")]
-    env: Vec<String>,
-    current_dir: Option<String>,
+#[derive(CustomDebug)]
+pub struct Field<T> {
+    value: T,
+    #[debug = "0b{:08b}"]
+    bitmask: u8,
 }
 
-fn main() {
-    let command = Command::builder()
-        .executable("cargo".to_owned())
-        .arg("build".to_owned())
-        .arg("--release".to_owned())
-        .build()
-        .unwrap();
+// impl<T> std::fmt::Debug for Field<T> {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         f.debug_struct("Field")
+//             .finish()
+//     }
+// }
 
-    assert_eq!(command.executable, "cargo");
-    assert_eq!(command.args, vec!["build", "--release"]);
+fn main() {
+    let f = Field {
+        value: "F",
+        bitmask: 0b00011100,
+    };
+
+    let debug = format!("{:?}", f);
+    let expected = r#"Field { value: "F", bitmask: 0b00011100 }"#;
+
+    assert_eq!(debug, expected);
 }
