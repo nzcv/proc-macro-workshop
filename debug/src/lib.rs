@@ -29,12 +29,29 @@ fn do_derive(ast:DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         }
     }).collect();
 
+    let mut top_types = Vec::new();
+    let mut ignore_types = Vec::new();
+
+    for mut field in fields {
+        if let Some(g) = utils::get_field_type_name(field)? {
+            top_types.push(g);
+        };
+        if let Some(sub_type) = utils::get_phantomdata_sub_type_name(field)? {
+            eprintln!("sub_type {:#?}", sub_type);
+            ignore_types.push(sub_type);
+        }
+    }
+
     let mut generics_new = ast.generics.clone();
     for mut g in generics_new.params.iter_mut() {
         if let GenericParam::Type(t) = g {
             eprintln!("{:#?}", t);
-            t.bounds.push(parse_quote!(std::fmt::Debug));
-            // t.bounds.push(syn::parse_quote!(std::fmt:Debug));
+            let ty_literal = t.ident.to_string();
+            if ignore_types.contains(&ty_literal) && !top_types.contains(&ty_literal) {
+                continue;
+            } else {
+                t.bounds.push(parse_quote!(std::fmt::Debug));
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::process::id;
 use syn::{Result};
 
 pub fn derive_get_struct_fields(ast: &syn::DeriveInput) -> Option<&syn::punctuated::Punctuated<syn::Field, syn::Token![,]>>{
@@ -159,4 +160,30 @@ pub fn get_attr_name(field: &syn::Field, ident_literal: &str, attar_literal: &st
         }
     }
     None
+}
+
+pub fn get_field_type_name(field: &syn::Field) -> syn::Result<Option<String>> {
+    if let syn::Type::Path(syn::TypePath{ path:syn::Path{ ref segments, .. }, .. }) = field.ty {
+        if let Some(syn::PathSegment{ ident, arguments, }) = segments.last() {
+            return Ok(Some(ident.to_string()))
+        }
+    }
+    Ok(None)
+}
+
+pub fn get_phantomdata_sub_type_name(field: &syn::Field) -> syn::Result<Option<String>> {
+    if let syn::Type::Path(syn::TypePath{path: syn::Path{ref segments, ..}, ..}) = field.ty {
+        if let Some(syn::PathSegment{ref ident, ref arguments}) = segments.last() {
+            if ident == "PhantomData" {
+                if let syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments{args, ..}) = arguments {
+                    if let Some(syn::GenericArgument::Type(syn::Type::Path( ref gp))) = args.first() {
+                        if let Some(generic_ident) = gp.path.segments.first() {
+                            return Ok(Some(generic_ident.ident.to_string()))
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return Ok(None)
 }
