@@ -144,7 +144,7 @@ pub fn get_attr_lit(field: &syn::Field, ident_literal: &str) -> Option<String> {
 pub fn get_attr_name(field: &syn::Field, ident_literal: &str, attar_literal: &str) -> Option<Result<String>> {
     if let Some(attr) = field.attrs.last() {
         if let Ok(ref meta) = attr.parse_meta() {
-            eprintln!("attr {:#?}", meta);
+            //eprintln!("attr {:#?}", meta);
             if meta.path().is_ident(ident_literal) {
                 if let syn::Meta::List(syn::MetaList{ nested, .. }) = meta {
                     if let Some(syn::NestedMeta::Meta( syn::Meta::NameValue(syn::MetaNameValue{ path, lit:syn::Lit::Str(lit), .. }))) = nested.last() {
